@@ -1,0 +1,156 @@
+SELECT * FROM dbo.nashvillehousings;
+
+-- Populate Property Address:
+
+SELECT * 
+FROM dbo.nashvillehousings a
+JOIN dbo.nashvillehousings b
+ ON a.parcelID = b.ParcelId
+ AND a.uniqueid <> b.uniqueid;
+
+
+SELECT a.parcelid, a.propertyaddress, b.parcelid, b.propertyaddress, ISNULL(a.propertyaddress, b.propertyaddress)
+FROM dbo.nashvillehousings a
+JOIN dbo.nashvillehousings b
+ ON a.parcelID = b.ParcelId
+ AND a.uniqueid <> b.uniqueid
+ WHERE a.propertyaddress IS NULL;
+
+UPDATE a 
+SET propertyaddress = ISNULL(a.propertyaddress, b.propertyaddress)
+FROM dbo.nashvillehousings a
+JOIN dbo.nashvillehousings b
+ ON a.parcelID = b.ParcelId
+ AND a.uniqueid <> b.uniqueid
+WHERE a.propertyaddress IS NULL;
+
+
+
+-- Splitting up the address into individual columns:
+
+SELECT propertyaddress
+FROM dbo.nashvillehousings ;
+
+SELECT 
+    substring(propertyaddress, 1, CHARINDEX(',', propertyaddress) -1 ) AS Address, 
+    substring(propertyaddress, CHARINDEX(',', propertyaddress) +1 , len(propertyaddress) )  AS Address  -- not including comma for next section 
+FROM dbo.nashvillehousings;
+
+
+
+ALTER TABLE nashvillehousings
+ADD PropertySplitAddress NVARCHAR(255);
+
+UPDATE nashvillehousings
+SET PropertySplitAddress = substring(propertyaddress, 1, CHARINDEX(',', propertyaddress) -1 ) 
+
+ALTER TABLE nashvillehousings
+ADD PropertySplitCity NVARCHAR(255);
+
+UPDATE nashvillehousings
+SET PropertySplitCity =  substring(propertyaddress, CHARINDEX(',', propertyaddress) +1 , len(propertyaddress) ) 
+
+--Check worked as expected:
+SELECT *
+FROM nashvillehousing;
+
+
+
+
+-- Split Owners Address using parsename with delimiters:
+
+SELECT owneraddress
+FROM nashvillehousings;
+
+SELECT PARSENAME(REPLACE(Owneraddress, ',', '.'), 3),
+PARSENAME(REPLACE(Owneraddress, ',', '.'), 2),
+PARSENAME(REPLACE(Owneraddress, ',', '.'), 1)
+FROM nashvillehousings;
+
+ALTER TABLE nashvillehousings
+ADD OwnerSplitAddress NVARCHAR(255);
+
+UPDATE nashvillehousings
+SET OwnerSplitAddress = PARSENAME(REPLACE(Owneraddress, ',', '.'), 3)
+
+
+ALTER TABLE nashvillehousings
+ADD OwnerSplitCity NVARCHAR(255);
+
+UPDATE nashvillehousings
+SET OwnerSplitCity =  PARSENAME(REPLACE(Owneraddress, ',', '.'), 2)
+
+
+ALTER TABLE nashvillehousings
+ADD OwnerSplitState NVARCHAR(255);
+
+UPDATE nashvillehousings
+SET OwnerSplitState =  PARSENAME(REPLACE(Owneraddress, ',', '.'), 1)
+
+-- Check:
+SELECT * FROM nashvillehousings;
+
+
+
+-- Changing 'Y' and 'N' to 'Yes' and 'No':
+
+SELECT DISTINCT(soldasvacant), COUNT(soldasvacant)
+FROM nashvillehousings
+GROUP BY soldasvacant;
+
+
+SELECT soldasvacant, 
+    CASE WHEN soldasvacant = 'Y' THEN 'Yes'
+        WHEN soldasvacant = 'N' THEN 'No'
+        ELSE soldasvacant  
+        END  
+AS issoldasvacant
+FROM nashvillehousings ;
+
+
+Update NashvilleHousings
+SET SoldAsVacant =CASE WHEN soldasvacant = 'Y' THEN 'Yes'
+        WHEN soldasvacant = 'N' THEN 'No'
+        ELSE soldasvacant  
+        END  
+AS issoldasvacant;
+
+
+
+-- Removing Duplicate Data Rows:
+
+WITH RowNumCTE AS(
+Select *,
+	ROW_NUMBER() OVER (
+	PARTITION BY ParcelID,
+				 PropertyAddress,
+				 SalePrice,
+				 SaleDate,
+				 LegalReference
+				 ORDER BY
+					UniqueID
+					) row_num
+
+From NashvilleHousings
+)
+SELECT * 
+From RowNumCTE
+Where row_num > 1;
+
+
+
+
+-- Delete Unused Columns:
+
+ALTER TABLE nashvillehousings 
+DROP COLUMN owneraddress, taxdistrict, propertyaddress 
+
+SELECT * from NashvilleHousings
+
+ALTER TABLE NashvilleHousings
+DROP COLUMN saledate;
+
+
+
+-- Now the data is in a more usable format. 
+
